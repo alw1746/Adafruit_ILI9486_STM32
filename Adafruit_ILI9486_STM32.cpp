@@ -12,7 +12,7 @@ gpio_reg_map *ctrlRegs;
 /*****************************************************************************/
 // Constructor uses hardware SPI, the pins being specific to each device
 /*****************************************************************************/
-Adafruit_ILI9486_STM32::Adafruit_ILI9486_STM32(void) : Adafruit_GFX(TFTWIDTH, TFTHEIGHT){}
+Adafruit_ILI9486_STM32::Adafruit_ILI9486_STM32(void) : Adafruit_GFX(TFTWIDTH, TFTHEIGHT), spiSet(SPISettings(32000000)), _trans(0) {}
 /*****************************************************************************/
 void writedata16(uint16_t c)
 {
@@ -117,6 +117,21 @@ void commandList(const uint8_t *addr)
 	}
 }
 /*****************************************************************************/
+void Adafruit_ILI9486_STM32::startSPI(void)
+{
+    if(_trans == 0)
+    	SPI.beginTransaction(TFT_CS, spiSet);
+    _trans++;
+}
+
+void Adafruit_ILI9486_STM32::endSPI(void)
+{
+    _trans--;
+    if(_trans == 0)
+    	SPI.endTransaction();
+    if(_trans < 0) _trans = 0; // sanity check if we end too many times, at least the next start will work...
+}
+
 void Adafruit_ILI9486_STM32::begin(void)
 {
 	ctrlRegs = TFT_CNTRL->regs;
@@ -137,14 +152,17 @@ void Adafruit_ILI9486_STM32::begin(void)
 		digitalWrite(TFT_RST, HIGH);
 		delay(200);
 	}
-    SPI.beginTransaction(TFT_CS, SPISettings(36000000));
+	startSPI();
+    //SPI.beginTransaction(TFT_CS, SPISettings(36000000));
 	// init registers
 	commandList(ili9486_init_sequence);
 	useDMA = 0;
+	endSPI();
 }
 /*****************************************************************************/
 void Adafruit_ILI9486_STM32::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
+	startSPI();
 	writecommand(ILI9486_CASET); // Column addr set
 	writedata(x0 >> 8);
 	writedata(x0 & 0xFF);     // XSTART
@@ -158,19 +176,24 @@ void Adafruit_ILI9486_STM32::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1
 	writedata(y1);     // YEND
 
 	writecommand(ILI9486_RAMWR); // write to RAM
+	endSPI();
 }
 /*****************************************************************************/
 void Adafruit_ILI9486_STM32::pushColor(uint16_t color)
 {
+	startSPI();
 	writedata16(color);
+	endSPI();
 }
 /*****************************************************************************/
 void Adafruit_ILI9486_STM32::drawPixel(int16_t x, int16_t y, uint16_t color)
 {
 	if ((x < 0) || (x >= _width) || (y < 0) || (y >= _height)) return;
 
+	startSPI();
 	setAddrWindow(x, y, x + 1, y + 1);
 	pushColor(color);
+	endSPI();
 }
 /*****************************************************************************/
 void Adafruit_ILI9486_STM32::drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color)
@@ -178,10 +201,12 @@ void Adafruit_ILI9486_STM32::drawFastVLine(int16_t x, int16_t y, int16_t h, uint
 	// Rudimentary clipping
 	if ((x >= _width) || (y >= _height || h < 1)) return;
 	if ((y + h - 1) >= _height)	{ h = _height - y; }
-	if (h < 2 ) { drawPixel(x, y, color); return; }
+	if (h < 2 ) { drawPixel(x, y, color); return; } // drawpixel already wrapped
 
+	startSPI();
 	setAddrWindow(x, y, x, y + h - 1);
 	writedata16(color, h);
+	endSPI();
 }
 /*****************************************************************************/
 void Adafruit_ILI9486_STM32::drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color)
@@ -189,17 +214,21 @@ void Adafruit_ILI9486_STM32::drawFastHLine(int16_t x, int16_t y, int16_t w, uint
 	// Rudimentary clipping
 	if ((x >= _width) || (y >= _height || w < 1)) return;
 	if ((x + w - 1) >= _width) { w = _width - x; }
-	if (w < 2 ) { drawPixel(x, y, color); return; }
+	if (w < 2 ) { drawPixel(x, y, color); return; } // drawPixel already wrapped
 
+	startSPI();
 	setAddrWindow(x, y, x + w - 1, y);
 	writedata16(color, w);
+	endSPI();
 }
 
 /*****************************************************************************/
 void Adafruit_ILI9486_STM32::fillScreen(uint16_t color)
 {
+	startSPI();
 	setAddrWindow(0, 0,  _width, _height);
 	writedata16(color, (_width*_height));
+	endSPI();
 }
 
 /*****************************************************************************/
@@ -210,12 +239,14 @@ void Adafruit_ILI9486_STM32::fillRect(int16_t x, int16_t y, int16_t w, int16_t h
 	if ((x + w - 1) >= _width) { w = _width  - x; }
 	if ((y + h - 1) >= _height) { h = _height - y; }
 	if (w == 1 && h == 1) {
-		drawPixel(x, y, color);
+		drawPixel(x, y, color); // already wrapped
 		return;
 	}
 
+	startSPI();
 	setAddrWindow(x, y, x + w - 1, y + h - 1);
 	writedata16(color, (w*h));
+	endSPI();
 }
 
 /*
@@ -336,6 +367,7 @@ uint16_t Adafruit_ILI9486_STM32::color565(uint8_t r, uint8_t g, uint8_t b)
 /*****************************************************************************/
 void Adafruit_ILI9486_STM32::setRotation(uint8_t m)
 {
+	startSPI();
 	writecommand(ILI9486_MADCTL);
 	rotation = m & 3; // can't be higher than 3
 	switch (rotation) {
@@ -360,9 +392,12 @@ void Adafruit_ILI9486_STM32::setRotation(uint8_t m)
 			_height = TFTWIDTH;
 			break;
 	}
+	endSPI();
 }
 /*****************************************************************************/
 void Adafruit_ILI9486_STM32::invertDisplay(boolean i)
 {
+	startSPI();
 	writecommand(i ? ILI9486_INVON : ILI9486_INVOFF);
+	endSPI();
 }
