@@ -1,7 +1,6 @@
 # Adafruit_ILI9486_STM32
 
-Based on Adafruit_ILI9486_STM lib: https://github.com/stevstrong/Adafruit_ILI9486_STM32  
-Modifications:  
+Modifications to original code:  
 - Replace Adafruit_ILI9486_STM32.cpp with version from http://stm32duino.com/download/file.php?id=2930  
 - This version incorporates SPI transactions to allow master-multiple slaves configuration.
 - Change pin definitions in Adafruit_ILI9486_STM32.h.
