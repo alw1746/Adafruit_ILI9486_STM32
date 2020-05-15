@@ -9,4 +9,4 @@ Based on Adafruit_ILI9341_STM lib: https://github.com/rogerclarkmelbourne/Arduin
 
 This lib uses the latest SPI features from my repository: https://github.com/stevstrong/Arduino_STM32/tree/master/STM32F1/libraries/SPI  
 
-#### Update: The Arduino sketches shown below will not work if you are using the official ST core. They were developed under Roger Clarke's  core as it was the only STM32 core available back then. Try this new driver https://github.com/ImpulseAdventure/Waveshare_ILI9486 if you want to port the sketches to ST core.
+#### Update: This driver was developed under Roger Clarke's STM32 core which was the only one available back then. Try this new driver https://github.com/ImpulseAdventure/Waveshare_ILI9486 if you want to port the sketches using the official ST core.
